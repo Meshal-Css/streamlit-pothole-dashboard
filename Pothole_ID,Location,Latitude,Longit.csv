@@ -1,0 +1,7 @@
+Pothole_ID,Location,Latitude,Longitude,Date_Detected,Severity,Pothole_Count,Crack_Count
+1,Al-Narjis,24.832592,46.682551,2023-09-01,Low Risk,5,10
+2,Al-Munsiyah,24.839311,46.774225,2023-09-05,High Risk,15,20
+3,Qurtubah,24.812424,46.753139,2023-09-10,Severe,25,30
+4,Al-Narjis,24.831111,46.681111,2023-09-15,Low Risk,3,5
+5,Al-Munsiyah,24.840000,46.775000,2023-09-20,High Risk,10,15
+6,Qurtubah,24.810000,46.750000,2023-09-25,Severe,20,25

@@ -1,0 +1,6 @@
+question,answer
+"What is pothole detection?", "Pothole detection is the process of identifying potholes in roads using computer vision."
+"What tools are used for pothole detection?", "Common tools include YOLO models and image processing libraries."
+"What are the risks associated with potholes?", "Potholes can cause vehicle damage, accidents, and increased maintenance costs."
+"How can potholes be repaired?", "Potholes are typically repaired by filling them with asphalt or concrete."
+"Why is pothole detection important?", "Early detection helps prevent accidents and saves maintenance costs."
