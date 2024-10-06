@@ -224,35 +224,124 @@ def dashboard_page():
     st.table(most_potholes[['Location', 'Pothole_Count']])
 
 
+import plotly.express as px
+from datetime import datetime
+import pandas as pd
+import folium
+from folium.plugins import HeatMap
+
 def heatmap_page():
-    st.title("Pothole Heatmap")
-    st.write("This page shows a heatmap of pothole detection locations from the uploaded file.")
+    st.title("Pothole Heatmap with Selection")
+    st.write("This page shows a table of potholes and allows you to select one to see its location and set its status.")
 
-    # تحميل الملف الجديد
+    # تحميل الملف الجديد باستخدام الفاصلة المنقوطة كفاصل
     new_file_path = 'potholes road detection _location_data.csv'  # تأكد من وضع المسار الصحيح للملف
-
-    # قراءة البيانات من الملف
     new_pothole_data = pd.read_csv(new_file_path, delimiter=';')
 
-    # تقسيم عمود 'Location' إلى أعمدة 'Longitude' و 'Latitude'
-    new_pothole_data[['Longitude', 'Latitude']] = new_pothole_data['Location'].str.split(',', expand=True)
+    # عرض أسماء الأعمدة الموجودة في الملف للتحقق منها
+    st.write("Columns in the file:", new_pothole_data.columns)
 
-    # تحويل القيم في أعمدة Latitude و Longitude إلى قيم رقمية
-    new_pothole_data['Latitude'] = pd.to_numeric(new_pothole_data['Latitude'], errors='coerce')
-    new_pothole_data['Longitude'] = pd.to_numeric(new_pothole_data['Longitude'], errors='coerce')
+    # التحقق مما إذا كان العمود 'Location' موجود
+    if 'Location,' in new_pothole_data.columns:
+        # تقسيم عمود 'Location' إلى أعمدة 'Longitude' و 'Latitude'
+        new_pothole_data[['Latitude', 'Longitude']] = new_pothole_data['Location,'].str.split(',', expand=True)
 
-    # فلترة البيانات لإزالة الصفوف التي تحتوي على قيم مفقودة
-    valid_data = new_pothole_data.dropna(subset=['Latitude', 'Longitude'])
+        # تحويل القيم في أعمدة Latitude و Longitude إلى قيم رقمية
+        new_pothole_data['Latitude'] = pd.to_numeric(new_pothole_data['Latitude'], errors='coerce')
+        new_pothole_data['Longitude'] = pd.to_numeric(new_pothole_data['Longitude'], errors='coerce')
 
-    if not valid_data.empty:
-        # إنشاء خريطة حرارية باستخدام البيانات الصالحة
-        m = folium.Map(location=[24.774265, 46.738586], zoom_start=13, tiles="CartoDB dark_matter")
-        HeatMap(valid_data[['Latitude', 'Longitude']].values).add_to(m)
+        # إضافة معرف فريد لكل حفرة بناءً على الترتيب
+        new_pothole_data['Pothole_ID'] = new_pothole_data.index + 1
 
-        # عرض الخريطة في Streamlit
-        st_folium(m, width=900, height=800)
+        # إضافة إحداثيات جديدة
+        new_entry = {
+            'Pothole_ID': new_pothole_data['Pothole_ID'].max() + 1,  # توليد معرف جديد بناءً على آخر معرف موجود
+            'Time': datetime.today().strftime('%Y-%m-%d'),
+            'Latitude': 24.85380,
+            'Longitude': 46.71320,
+            'تمت المعالجة': False,
+            'تحت المعالجة': False,
+            'لم تتم المعالجة': True
+        }
+
+        # إضافة الحفرة الجديدة إلى البيانات
+        new_pothole_data = new_pothole_data.append(new_entry, ignore_index=True)
+
+        # فلترة البيانات لإزالة الصفوف التي تحتوي على قيم مفقودة
+        valid_data = new_pothole_data.dropna(subset=['Latitude', 'Longitude'])
+
+        if not valid_data.empty:
+            # اختيار الحفرة من القائمة
+            selected_pothole = st.selectbox("Select a pothole to update its status:", valid_data['Pothole_ID'])
+
+            # عرض البيانات الخاصة بالحفرة المختارة
+            selected_data = valid_data[valid_data['Pothole_ID'] == selected_pothole]
+            st.write("Selected Pothole Details:")
+            st.table(selected_data[['Pothole_ID', 'Time', 'Latitude', 'Longitude']])
+
+            # تحديث الحالة بناءً على اختيارات المستخدم
+            st.write("Update Pothole Status:")
+            valid_data.loc[valid_data['Pothole_ID'] == selected_pothole, 'تمت المعالجة'] = st.checkbox("تمت المعالجة", key=f"fixed_{selected_pothole}")
+            valid_data.loc[valid_data['Pothole_ID'] == selected_pothole, 'تحت المعالجة'] = st.checkbox("تحت المعالجة", key=f"in_progress_{selected_pothole}")
+            valid_data.loc[valid_data['Pothole_ID'] == selected_pothole, 'لم تتم المعالجة'] = not (
+                valid_data.loc[valid_data['Pothole_ID'] == selected_pothole, 'تمت المعالجة'].values[0] or
+                valid_data.loc[valid_data['Pothole_ID'] == selected_pothole, 'تحت المعالجة'].values[0]
+            )
+
+            # عرض الخريطة مع الموقع المحدد للحفرة
+            m = folium.Map(location=[24.774265, 46.738586], zoom_start=13, tiles="CartoDB dark_matter")
+            for index, row in selected_data.iterrows():
+                folium.Marker(
+                    location=[row['Latitude'], row['Longitude']],
+                    popup=f"Pothole ID: {row['Pothole_ID']}<br>Time: {row['Time']}<br>Status: {row['تمت المعالجة']}"
+                ).add_to(m)
+
+            # عرض الخريطة في Streamlit
+            st_folium(m, width=900, height=800)
+
+            # عرض إحصائيات التفاعل بناءً على حالة المعالجة
+            st.subheader("Pothole Processing Statistics")
+
+            # حساب عدد الحفر بناءً على اختيار المستخدم
+            status_counts = {
+                'تمت المعالجة': valid_data['تمت المعالجة'].sum(),
+                'تحت المعالجة': valid_data['تحت المعالجة'].sum(),
+                'لم تتم المعالجة': valid_data['لم تتم المعالجة'].sum()
+            }
+
+            # رسم الدائرة التفاعلية
+            fig = px.pie(
+                names=status_counts.keys(), 
+                values=status_counts.values(), 
+                title='Pothole Processing Status'
+            )
+            st.plotly_chart(fig)
+
+            # *** إضافة الخريطة الحرارية ***
+            st.subheader("Heatmap of Pothole Locations")
+
+            # إنشاء خريطة حرارية باستخدام المواقع الصالحة
+            heatmap_data = valid_data[['Latitude', 'Longitude']].dropna().values.tolist()
+
+            # إنشاء خريطة جديدة للحرارة
+            heatmap_map = folium.Map(location=[24.774265, 46.738586], zoom_start=13, tiles="CartoDB dark_matter")
+            HeatMap(heatmap_data).add_to(heatmap_map)
+
+            # عرض الخريطة الحرارية في Streamlit
+            st_folium(heatmap_map, width=900, height=800)
+
+        else:
+            st.error("No valid data available in the file.")
     else:
-        st.error("No valid data available in the file.")
+        st.error("Column 'Location' not found in the file.")
+
+
+
+
+
+
+
+
 
 
 def neighborhoods_page():
