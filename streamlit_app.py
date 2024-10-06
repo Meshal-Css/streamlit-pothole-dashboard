@@ -4,6 +4,7 @@ import cv2
 import tempfile
 import pandas as pd
 import folium
+from folium.plugins import HeatMap
 from streamlit_folium import st_folium
 import plotly.express as px
 from streamlit_chat import message
@@ -11,10 +12,11 @@ import openai
 import random
 import numpy as np
 from PIL import Image
+import sqlite3  
 
 st.set_page_config(page_title="Pothole Detection", page_icon="🚧", layout="wide")
 
-openai.api_key = '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'  
+openai.api_key = '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' 
 
 # Load YOLO model
 model = YOLO("best (3).pt")
@@ -22,20 +24,12 @@ model = YOLO("best (3).pt")
 faq_df = pd.read_csv('pothole_detection_faq.csv')  
 faq_df.columns = faq_df.columns.str.strip() 
 
-pothole_data = pd.read_csv('Pothole_ID,Location,Latitude,Longit.csv')
+pothole_data = pd.read_csv('updated_pothole_data.csv')
 pothole_data.columns = pothole_data.columns.str.strip()  
 
 def apply_custom_css():
     st.markdown("""
         <style>
-            /* خلفية الصورة */
-            body {
-                background-image: url('C:/Users/MSI1/Documents/VS/image ba.jpg'); /* استبدل بالمسار الخاص بالصورة */
-                background-size: cover;
-                background-position: center;
-                background-attachment: fixed;
-            }
-
             /* إعدادات الصفحة العامة */
             .main {
                 background-color: rgba(46, 52, 64, 0.8);
@@ -61,34 +55,20 @@ def apply_custom_css():
             .stButton > button:hover {
                 background-color: #81A1C1;  
             }
-
-            /* تخصيص الرسائل في الدردشة */
-            .chat-message {
-                padding: 10px;
-                border-radius: 10px;
-                margin: 5px 0;
-            }
-            .user-message {
-                background-color: #A3BE8C; 
-                color: black;
-                text-align: right;
-            }
-            .bot-message {
-                background-color: #81A1C1; 
-                color: black;
-                text-align: left;
-            }
-
-            /* إضافة padding للدردشة */
-            .chat-container {
-                padding: 20px;
-                border-radius: 10px;
-                background-color: rgba(59, 66, 82, 0.8);
-                max-height: 400px;
-                overflow-y: auto;
-            }
         </style>
     """, unsafe_allow_html=True)
+
+
+#def get_drilling_data():
+    #conn = sqlite3.connect('drilling_data.db')  
+    #cursor = conn.cursor()
+    
+    
+    #cursor.execute('SELECT latitude, longitude FROM drilling_records')
+    #data = cursor.fetchall()
+
+    #conn.close()  
+    #return data
 
 def classify_surface_condition(prediction):
     if prediction == 0:
@@ -130,29 +110,35 @@ def detect_potholes_video(video_path):
     return output_video_path, pothole_count
 
 def detect_potholes_image(image):
-    # تحويل الصورة إلى RGB
     image = image.convert("RGB")
     img = np.array(image)
     results = model(img)
     
-    pothole_count = len(results[0].boxes)  # عدد الحفر المكتشفة
-    result_image = results[0].plot()  # رسم النتائج على الصورة
+    pothole_count = len(results[0].boxes)  
+    result_image = results[0].plot()  
 
     return result_image, pothole_count
 
-    return result_image, pothole_count
-
-def get_response(user_input):
-    answer = faq_df.loc[faq_df['question'].str.lower() == user_input.lower(), 'answer']
-    if not answer.empty:
-        return answer.values[0]
+def get_response(user_input, pothole_count):
+    report = f"I detected {pothole_count} pothole(s) in the media you provided."
     
+    if pothole_count == 0:
+        recommendations = "No action needed. The road appears to be in good condition."
+    elif 1 <= pothole_count <= 3:
+        recommendations = "Consider patching the potholes to improve road safety."
+    else:
+        recommendations = "Immediate maintenance is recommended to address the multiple potholes."
+
+    context = f"{report}\n{recommendations}\n\n"
+
     response = openai.ChatCompletion.create(
         model="gpt-3.5-turbo",
         messages=[
-            {"role": "user", "content": user_input}
+            {"role": "system", "content": "You are a helpful assistant knowledgeable about pothole detection."},
+            {"role": "user", "content": context + user_input}
         ]
     )
+    
     return response['choices'][0]['message']['content']
 
 def main_page():
@@ -171,13 +157,12 @@ def main_page():
 
         if result_video_path:
             st.video(result_video_path)
-            st.success(f"Detected {pothole_count} potholes in the video.")
 
             pothole_severity = classify_surface_condition(pothole_count)
 
             pothole_data = {
                 "Severity": [pothole_severity],
-                "Pothole Location": ["Riyadh"]
+                
             }
             df = pd.DataFrame(pothole_data)
 
@@ -194,22 +179,22 @@ def main_page():
             st.write("No results found. Please check your model.")
 
     if uploaded_image is not None:
-        # قراءة الصورة باستخدام PIL
         image = Image.open(uploaded_image)
         st.image(image, caption="Uploaded Image", use_column_width=True)
 
-        # معالجة الصورة للتنبؤ
         result_image, pothole_count = detect_potholes_image(image)
 
-        # عرض الصورة مع النتائج
         st.image(result_image, caption="Detected Potholes", use_column_width=True)
         st.success(f"Detected {pothole_count} potholes in the image.")
+
+        
+        chatbot(pothole_count)
 
 def dashboard_page():
     st.title("Pothole Detection Dashboard")
     st.write("This page shows visualizations of detected potholes and cracks.")
 
-    m = folium.Map(location=[24.774265, 46.738586], zoom_start=13, tiles="CartoDB dark_matter")  # تقليل مستوى التكبير
+    m = folium.Map(location=[24.774265, 46.738586], zoom_start=13, tiles="CartoDB dark_matter")
 
     for _, row in pothole_data.iterrows():
         folium.Marker(
@@ -218,8 +203,7 @@ def dashboard_page():
             icon=folium.Icon(color='red')
         ).add_to(m)
 
-    # تقليل حجم الخريطة
-    st_folium(m, width=900, height=800)  # تغيير الأبعاد هنا
+    st_folium(m, width=900, height=800)
 
     st.subheader("Pothole Data")
     st.table(pothole_data)
@@ -239,14 +223,46 @@ def dashboard_page():
     st.write("Top 5 Neighborhoods with Most Potholes:")
     st.table(most_potholes[['Location', 'Pothole_Count']])
 
+
+def heatmap_page():
+    st.title("Pothole Heatmap")
+    st.write("This page shows a heatmap of pothole detection locations from the uploaded file.")
+
+    # تحميل الملف الجديد
+    new_file_path = 'potholes road detection _location_data.csv'  # تأكد من وضع المسار الصحيح للملف
+
+    # قراءة البيانات من الملف
+    new_pothole_data = pd.read_csv(new_file_path, delimiter=';')
+
+    # تقسيم عمود 'Location' إلى أعمدة 'Longitude' و 'Latitude'
+    new_pothole_data[['Longitude', 'Latitude']] = new_pothole_data['Location'].str.split(',', expand=True)
+
+    # تحويل القيم في أعمدة Latitude و Longitude إلى قيم رقمية
+    new_pothole_data['Latitude'] = pd.to_numeric(new_pothole_data['Latitude'], errors='coerce')
+    new_pothole_data['Longitude'] = pd.to_numeric(new_pothole_data['Longitude'], errors='coerce')
+
+    # فلترة البيانات لإزالة الصفوف التي تحتوي على قيم مفقودة
+    valid_data = new_pothole_data.dropna(subset=['Latitude', 'Longitude'])
+
+    if not valid_data.empty:
+        # إنشاء خريطة حرارية باستخدام البيانات الصالحة
+        m = folium.Map(location=[24.774265, 46.738586], zoom_start=13, tiles="CartoDB dark_matter")
+        HeatMap(valid_data[['Latitude', 'Longitude']].values).add_to(m)
+
+        # عرض الخريطة في Streamlit
+        st_folium(m, width=900, height=800)
+    else:
+        st.error("No valid data available in the file.")
+
+
 def neighborhoods_page():
     st.title("Neighborhoods in Riyadh")
     st.write("Click on a neighborhood to see pothole details.")
 
     neighborhoods = {
-        "Al-Narjis": {"location": [24.832592631493867, 46.682551601963375], "potholes": 30, "severity": "Low Risk"},
-        "Al-Munsiyah": {"location": [24.839311029020966, 46.77422508429597], "potholes": 70, "severity": "High Risk"},
-        "Qurtubah": {"location": [24.812424274752065, 46.75313865668322], "potholes": 120, "severity": "Severe"}
+        "Al-Narjis": {"location": [24.832592631493867, 46.682551601963375], "potholes": 660, "severity": "Severe"},
+        "Al-Munsiyah": {"location": [24.839311029020966, 46.77422508429597], "potholes": 70, "severity": "low Risk"},
+        "Qurtubah": {"location": [24.812424274752065, 46.75313865668322], "potholes": 100, "severity": "Severe"}
     }
 
     selected_neighborhood = st.selectbox("Select Neighborhood", options=list(neighborhoods.keys()))
@@ -261,33 +277,44 @@ def neighborhoods_page():
         folium.Marker(location=selected_info["location"], popup=selected_neighborhood).add_to(m)
         st_folium(m, width=500, height=400)  
 
-# Chatbot functionality
-def chatbot():
+def chatbot(pothole_count):
     if 'generated' not in st.session_state:
         st.session_state['generated'] = []
     if 'past' not in st.session_state:
         st.session_state['past'] = []
 
-    user_input = st.text_input("Ask me anything about pothole detection", key="user_input")
     
-    if st.button("Send"):
+    st.markdown('<div class="chat-container">', unsafe_allow_html=True)  
+    st.markdown('<div class="chat-header">Chatbot</div>', unsafe_allow_html=True)
+    st.markdown('<div class="chat-messages">', unsafe_allow_html=True)
+
+    
+    for i in range(len(st.session_state['generated'])):
+        st.markdown(f'<div class="chat-message user-message">{st.session_state["past"][i]}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="chat-message bot-message">{st.session_state["generated"][i]}</div>', unsafe_allow_html=True)
+
+    st.markdown('</div>', unsafe_allow_html=True)  
+
+    
+    user_input = st.text_input("اسألني عن كشف الحفر", key="user_input")
+    
+    if st.button("إرسال"):
         if user_input:
-            output = get_response(user_input)
+            output = get_response(user_input, pothole_count)
             st.session_state['past'].append(user_input)
             st.session_state['generated'].append(output)
 
-    # Display chat messages
-    with st.container():
-        for i in range(len(st.session_state['generated'])):
-            message(st.session_state["generated"][i], key=f"generated_{i}", is_user=False)
-            message(st.session_state['past'][i], key=f"past_{i}", is_user=True)
+    st.markdown('</div>', unsafe_allow_html=True)  
+
+
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # Navigation
 pages = {
     "Main Page": main_page,
     "Dashboard": dashboard_page,
+    "Heatmap": heatmap_page,
     "Neighborhoods": neighborhoods_page,
-    "Chatbot": chatbot
 }
 
 st.sidebar.title("Navigation")
