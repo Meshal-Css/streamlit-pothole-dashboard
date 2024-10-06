@@ -239,10 +239,10 @@ def heatmap_page():
 
     st.write("Columns in the file:", new_pothole_data.columns)
 
-    if 'Location,' in new_pothole_data.columns:
+    if 'Location' in new_pothole_data.columns:
         st.write("Column 'Location' found.")
         
-        new_pothole_data[['Latitude', 'Longitude']] = new_pothole_data['Location,'].str.split(',', expand=True)
+        new_pothole_data[['Latitude', 'Longitude']] = new_pothole_data['Location'].str.split(',', expand=True)
 
         new_pothole_data['Latitude'] = pd.to_numeric(new_pothole_data['Latitude'], errors='coerce')
         new_pothole_data['Longitude'] = pd.to_numeric(new_pothole_data['Longitude'], errors='coerce')
