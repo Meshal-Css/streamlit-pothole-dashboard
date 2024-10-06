@@ -244,7 +244,7 @@ def heatmap_page():
     # التحقق مما إذا كان العمود 'Location' موجود
     if 'Location,' in new_pothole_data.columns:
         # تقسيم عمود 'Location' إلى أعمدة 'Longitude' و 'Latitude'
-        new_pothole_data[['Latitude', 'Longitude']] = new_pothole_data['Location,'].str.split(',', expand=True)
+        new_pothole_data[['Latitude', 'Longitude']] = new_pothole_data['Location'].str.split(',', expand=True)
 
         # تحويل القيم في أعمدة Latitude و Longitude إلى قيم رقمية
         new_pothole_data['Latitude'] = pd.to_numeric(new_pothole_data['Latitude'], errors='coerce')
