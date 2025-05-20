@@ -34,6 +34,10 @@ streamlit run streamlit_app.py
 - Cluster potholes on map view
 
 
+![heatmap](images/heatmap1.png)
+
+
+
 
 
 
