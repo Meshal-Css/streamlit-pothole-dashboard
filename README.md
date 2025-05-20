@@ -34,7 +34,7 @@ streamlit run streamlit_app.py
 - Cluster potholes on map view
 
 
-![heatmap](images/heatmap1.png)
+![heatmap](https://github.com/Meshal-Css/streamlit-pothole-dashboard/blob/main/image4.jpg)
 
 
 
