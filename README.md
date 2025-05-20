@@ -39,6 +39,7 @@ streamlit run streamlit_app.py
 ![heatmap](https://github.com/Meshal-Css/streamlit-pothole-dashboard/blob/main/image1.jpg)
 ![heatmap](https://github.com/Meshal-Css/streamlit-pothole-dashboard/blob/main/image3.jpg)
 ![vedio1](https://github.com/Meshal-Css/streamlit-pothole-dashboard/blob/main/video1.mp4)
+![vedio2](https://github.com/Meshal-Css/streamlit-pothole-dashboard/blob/main/video2.mp4)
 
 
 
